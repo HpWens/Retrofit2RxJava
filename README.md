@@ -1,17 +1,33 @@
-# RetrofitView
+# Retrofit2RxJava
 
-`Retrofit2`是`square`公司出品的一个网络请求库，网上有很多相关的介绍。我很久以前都想去研究了，但一直都有各种事情耽搁，让我们一起去捋一捋，这篇主要讲解`Retrofit2`与`RxJava`的用法。
+`Retrofit2`是`square`公司出品的一个网络请求库，网上有很多相关的介绍。我很久以前都想去研究了，但一直都有各种事情耽搁，现在就让我们一起去捋一捋，这篇主要讲解`Retrofit2`与`RxJava`的基本用法。
 
- 1. `get`请求 （泛型处理返回结果，`HashMap`组装参数，获取返回字符串）
- 2. `post`请求(包括`key/value`,以及`body`)
- 3. 文件上传(进度监听)
- 4. 文件下载
- 5. 开启日志拦截
- 6. 与RxJava配合使用
+-  `get`请求 
+
+-  `post`请求
+
+-  文件上传
+
+-  文件下载
+
+-  开启日志拦截
+
+-  与RxJava结合使用
+
+##什么是Retrofit2
+
+官网是这么介绍的：
+
+```
+Retrofit adapts a Java interface to HTTP calls by using annotations on the declared methods to 
+define how requests are made。
+```
+
+我翻译的可能不准确，他的大概意思是说：Retrofit 是一个 java 接口类，以注解的方式用于 HTTP 网络请求。那下面我们一起来看看是怎么使用的？
 
 ##使用前的配置
 
-gradle 构建：
+build.gradle 的 dependencies 添加：
 
 ```
     compile 'com.google.code.gson:gson:2.3.1'
@@ -19,53 +35,53 @@ gradle 构建：
     compile 'com.squareup.retrofit2:converter-gson:2.0.0'
     compile 'com.squareup.okhttp3:logging-interceptor:3.2.0'
 ```
+----------
 
-新建`RestClient`构造http接口类，核心代码：
+##获取Retrofit实例
+
 ```
-retrofit=new Retrofit.Builder()
-              .baseUrl(BASE_URL)
-              .addConverterFactory(GsonConverterFactory.create())
-              .build();
- myService=retrofit.create(MyService.class);
+Retrofit retrofit = new Retrofit.Builder()
+    .baseUrl("http://plus31.366ec.net/")
+    .addConverterFactory(GsonConverterFactory.create())
+    .build();
 ```
 
-生成了代理类之后，就可以进行相应请求了。
+需要注意的是`baseUrl`添加的是地址的主域名。
 
-##get请求
-
-###1、新建接口类RestService
+##申明RestService接口类
 
 ```
 public interface RestService {
-
-    @GET("/Route.axd?method=vast.sync.category.issued&format=Json")
-    Call<ApiResponse<Category>> getCategory(@Query("StoreId") String storeId,
-                                            @Query("Condition") String condition,
-                                            @Query("LastUpdateTime") String lastUpdateTime,
-                                            @Query("PageIndex") String pageIndex,
-                                            @Query("PageSize") String pageSize);
-                          }                  
+    @GET("/Route.axd?method=vast.Store.manager.list")
+    Call<ResponseBody> getManagerData(@Query("StoreId") int id);
+}
 ```
 
-需要注意`@Query`注解不能丢，即使形参和请求的`key`相同也要加上，否则报错；`@GET("")`内容为访问地址的后部分，记得我第一次理解的时候根本不知道是什么玩意。比如：`url="http://plus.366ec.net/Route.axd?method=vast.sync.category.issued&format=Json"`，那么`@GET`的内容为 `@GET("/Route.axd?method=vast.sync.category.issued&format=Json")`。
+`@GET` 包含的是请求地址，是主域名之后的地址。举个例子，请求的
 
-###2、新建类RestClient
+全地址：`http://plus31.366ec.net/Route.axd?method=vast.Store.manager.list`，
+
+主域名为：`http://plus31.366ec.net/`
+
+@GET包含的地址为：`/Route.axd?method=vast.Store.manager.list`
+
+这样就完成了一个简单的`@GET`封装。
+
+##创建RestClient类
 
 ```
 public class RestClient {
 
     private Retrofit mRetrofit;
-    //上面例子URL的前部分
-    private static final String BASE_URL = "http://plus.366ec.net";
+    private static final String BASE_URL = "http://plus31.366ec.net/";
     private RestService mService;
 
+    //构造方法
     public RestClient() {
-
         mRetrofit = new Retrofit.Builder()
                 .baseUrl(BASE_URL)
                 .addConverterFactory(GsonConverterFactory.create())
                 .build();
-
         mService = mRetrofit.create(RestService.class);
     }
 
@@ -75,64 +91,54 @@ public class RestClient {
         }
         return null;
     }
-
 }
-```
-
-`RestClient` 类返回`RestService`接口的实例。
-
-###3、新建类ApiResponse
 
 ```
-public class ApiResponse<T> {
 
-    @SerializedName("Code")
-    public int code;
+这样就生成了一个简单的代理类，然后就可以进行相应请求了。
 
-    @SerializedName("ServerTime")
-    public String serverTime;
-
-    @SerializedName("List")
-    public List<T> categoryList;
-}
-```
-
-我们提前来看一下返回的`Json`字符串，好分析一下解决`ApiResponse`怎么去写？
+##Get请求
 
 ```
-{"Code":"0","ServerTime":"2016/5/18 21:52:24","RowCount":"13","PageCount":"1","List":[{"categoryid":4,"parentid":0,"name":"书籍","status":1,"sortorder":0,"remark":"","productcount":"2"},{"categoryid":5,"parentid":0,"name":"历史","status":1,"sortorder":0,"remark":"","productcount":"0"},]}
-```
+public class SimpleGetActivity extends AppCompatActivity {
 
-你想一想，列表数据请求不同的地址可能返回回来的数据是不一样的，难道我每次都要去新建一个`ApiResponse`类吗，答案肯定是否的。用泛型就可以很好的解决这类问题。
+    private Button btnGet;
+    private TextView tvResult;
 
-
-###4、MainActivity类
-
-一起看看怎么使用：
-
-```
-public class MainActivity extends AppCompatActivity {
-
-    private RestClient mClient;
+    private RestClient mRestClient;
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+        setContentView(R.layout.activity_simple_get);
 
-        mClient = new RestClient();
+        btnGet = (Button) findViewById(R.id.btn_get);
+        tvResult = (TextView) findViewById(R.id.tv_result);
 
-        Call<ApiResponse<Category>> data = mClient.getRectService().getCategory("1", "", "", "1", "20");
 
-        data.enqueue(new Callback<ApiResponse<Category>>() {
+        btnGet.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void onResponse(Call<ApiResponse<Category>> call, Response<ApiResponse<Category>> response) {
-                 Log.e("---------------",response.body().categoryList.get(0).name);
-            }
+            public void onClick(View view) {
+                //获取实例
+                mRestClient = new RestClient();
 
-            @Override
-            public void onFailure(Call<ApiResponse<Category>> call, Throwable t) {
+                Call<ResponseBody> responseBodyCall = mRestClient.getRectService().getManagerData(49);
+                //调用回调接口
+                responseBodyCall.enqueue(new Callback<ResponseBody>() {
+                    @Override
+                    public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
+                        try {
+                            tvResult.setText(response.body().string());
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                    }
 
+                    @Override
+                    public void onFailure(Call<ResponseBody> call, Throwable t) {
+
+                    }
+                });
             }
         });
     }
@@ -140,193 +146,187 @@ public class MainActivity extends AppCompatActivity {
 
 ```
 
-`getCategory("1", "", "", "1", "20");`接受参数，如果我想用`HashMap`来传递参数呢？
+一起来看看效果：
 
-第一步修改`@GET`
+![retro](http://img.blog.csdn.net/20160729102546858)
 
-```
-    @GET("/Route.axd?method=vast.sync.category.issued&format=Json")
-    Call<ApiResponse<Category>> getCategory(@QueryMap HashMap<String, String> hm);
-```
+----------
 
-注意：`@QueryMap`必须要用，不然会提示错误。`@GET`添加`@QueryMap`；`@POST`添加`@Body`。
+分析返回的 `json`数据，包含集合，那么我们可以进一步对接口返回值进行数据的封装。
 
-第二步修改调用的地方：
+###BaseResponse类
 
 ```
-        HashMap<String,String> hm=new HashMap<>();
-        hm.put("StoreId","1");
-        hm.put("Condition","");
-        hm.put("LastUpdateTime","");
-        hm.put("PageIndex","1");
-        hm.put("PageSize","20");
+public class BaseResponse<T> {
 
-        Call<ApiResponse<Category>> data = mClient.getRectService().getCategory(hm);
+    @SerializedName("data")
+    public List<T> managerList;
 
-        data.enqueue(new Callback<ApiResponse<Category>>() {
+    @SerializedName("code")
+    public int code;
+    
+    @SerializedName("message")
+    public String message;
+}
+```
+
+注意：`BaseResponse`类的字段，根据自己返回`json`数据新增或者删除。
+
+根据返回的`json`集合，那么我们肯定有个实体类了。
+
+###Manager类
+
+```
+public class Manager {
+
+    public int Id;
+
+    public String UserName;
+
+}
+```
+
+`Manager` 类你可以替换成你自己的实体类。
+
+###Get的进一步封装
+
+```
+@GET("/Route.axd?method=vast.Store.manager.list")
+Call<BaseResponse<Manager>> getManagerDatas(@Query("StoreId") int id);
+```
+
+注意：我们这里对方法的返回值进行了一个修改`Call<BaseResponse<Manager>>`
+
+来看看封装后的`Activity`类：
+
+```
+public class GetActivity extends AppCompatActivity {
+
+    private Button btnGet;
+
+    private RestClient mRestClient;
+
+    private RecyclerView mRecyclerView;
+
+    private BaseRecyclerAdapter<Manager> mAdapter;
+
+    @Override
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_get);
+
+        btnGet = (Button) findViewById(R.id.btn_get);
+        mRecyclerView = (RecyclerView) findViewById(R.id.rv);
+        mRecyclerView.setLayoutManager(new LinearLayoutManager(this));
+
+        btnGet.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void onResponse(Call<ApiResponse<Category>> call, Response<ApiResponse<Category>> response) {
-                 Log.e("---------------",response.body().categoryList.get(0).name);
-            }
+            public void onClick(View view) {
+                //获取实例
+                mRestClient = new RestClient();
 
-            @Override
-            public void onFailure(Call<ApiResponse<Category>> call, Throwable t) {
+                Call<BaseResponse<Manager>> baseResponseCall = mRestClient.getRectService().getManagerDatas(49);
 
-            }
-        });
-```
-
-当然后时候我们更希望获取返回的字符串，那我们又改怎么修改呢？
-
-第一步：
-
-```
-    @GET("/Route.axd?method=vast.sync.category.issued&format=Json")
-    Call<ResponseBody> getCategory(@QueryMap HashMap<String, String> hm);
-```
-
-第二步：
-
-```
-       HashMap<String,String> hm=new HashMap<>();
-        hm.put("StoreId","1");
-        hm.put("Condition","");
-        hm.put("LastUpdateTime","");
-        hm.put("PageIndex","1");
-        hm.put("PageSize","20");
-
-        Call<ResponseBody> data = mClient.getRectService().getCategory(hm);
-
-        data.enqueue(new Callback<ResponseBody>() {
-            @Override
-            public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
-
-                ResponseBody body = response.body();
-
-                try {
-                    BufferedReader reader = new BufferedReader(new InputStreamReader(body.byteStream()));
-                    StringBuilder out = new StringBuilder();
-                    String newLine = System.getProperty("line.separator");//换行符号
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        out.append(line);
-                        out.append(newLine);
+                baseResponseCall.enqueue(new Callback<BaseResponse<Manager>>() {
+                    @Override
+                    public void onResponse(Call<BaseResponse<Manager>> call, Response<BaseResponse<Manager>> response) {
+                        //获取返回的集合数据
+                        //response.body().managerList
+                        mAdapter = new BaseRecyclerAdapter<Manager>(GetActivity.this, response.body().managerList, R.layout.rv_item) {
+                            @Override
+                            protected void convert(BaseViewHolder helper, Manager item) {
+                                helper.setText(R.id.tv_item_text, item.UserName);
+                            }
+                        };
+                        mRecyclerView.setAdapter(mAdapter);
                     }
 
-                    // Prints the correct String representation of body.
-                    System.out.println(out);
-                    Log.e("---------------", ""+out);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
+                    @Override
+                    public void onFailure(Call<BaseResponse<Manager>> call, Throwable t) {
 
-            @Override
-            public void onFailure(Call<ResponseBody> call, Throwable t) {
+                    }
+                });
 
             }
         });
+    }
+}
 ```
 
+来看看效果：
 
-##post请求(key/value)
+![retro](http://img.blog.csdn.net/20160729112322721)
 
-```
-    @FormUrlEncoded
-    @POST("/Route.axd?method=vast.sync.category.issued&format=Json")
-    Call<ApiResponse<Category>> postCategory(@Field("StoreId") String storeId, @Field("Condition") String condition,
-                                             @Field("LastUpdateTime") String lastUpdateTime, @Field("PageIndex") String pageIndex,
-                                             @Field("PageSize") String pageSize);
-```
+----------
 
-```
-        Call<ApiResponse<Category>> data = mClient.getRectService().postCategory("1","","","1","20");
+###Get常用技巧
 
-        data.enqueue(new Callback<ApiResponse<Category>>() {
-            @Override
-            public void onResponse(Call<ApiResponse<Category>> call, Response<ApiResponse<Category>> response) {
-
-                Log.e("----------",""+response.body().categoryList.get(0).name);
-            }
-
-            @Override
-            public void onFailure(Call<ApiResponse<Category>> call, Throwable t) {
-
-            }
-        });
-```
-
-##Post请求(body体)
+`HashMap组装参数`：
 
 ```
-    @POST("/Route.axd?method=vast.Store.terminal.bind&format=Json")
-    Call<ApiResponse<Category>> postCategory(@Body Store store);
+@GET("/Route.axd?method=vast.Store.manager.list")
+    Call<BaseResponse<Manager>> getManagerDatas(@QueryMap HashMap<String, String> hm);
 ```
 
+`Get` 请求就讲到这里了，下面一起来看看 `Post`请求。
+
+##Post请求
+
 ```
-        Store store=new Store();
-
-        store.StoreId="1";
-        store.Condition="";
-        store.LastUpdateTime="";
-        store.PageIndex="1";
-        store.PageSize="20";
-
-        Call<ApiResponse<Category>> data = mClient.getRectService().postCategory("1","","","1","20");
+  @FormUrlEncoded
+    @POST("/Route.axd?method=vast.Store.manager.list")
+    Call<BaseResponse<Manager>> postManagerDatas(@Field("StoreId") int id);
 ```
 
+`@Field("StoreId") int id`可以替换`@Body`，`@Body`你可以传入`HashMap`、实体 `beans` 等对象。
 
-注意：使用此方法会默认加上Content-Type: application/json; charset=UTF-8的请求头，即以JSON格式请求，再以JSON格  式响应。这里特别要注意的是JSON格式，类似`{"Condition":"","LastUpdateTime":"","PageIndex":"1","PageSize":"20","StoreId":"1"}`，如果&格式请求，就会出现错误，如`StoreId=1&Condition=&LastUpdateTime=&PageIndex=1&PageSize=20`。在使用的过程中你会发现`get`请求用`post`也可以请求，但使用此方法请区分开。
+注意：以`@Body`上传参数，会默认加上`Content-Type: application/json;` `charset=UTF-8`的请求头，即以`JSON`格式请求，再以`JSON`格式响应。
 
 ##单个文件上传
 
 ```
     @Multipart
-    @POST("/HpWens/ProgressDemo/")
-    Call<ResponseBody> uploadFile(Part("username") RequestBody username,@Part("address") RequestBody address,@Part  MultipartBody.Part file);
+    @POST("/UploadProduct.axd")
+    Call<ResponseBody> uploadSimpleFile(@Part MultipartBody.Part file);
 ```
 
+文件上传稍微复杂点，具体请看以下代码：
+
 ```
-        mFileName = "6348.jpg";
-
-        File file=new File(Environment.getExternalStorageDirectory(),mFileName);
-
-        //普通key/value
-        RequestBody username =
-                RequestBody.create(
-                        MediaType.parse("multipart/form-data"), "ws");
-
-        RequestBody address =
-                RequestBody.create(
-                        MediaType.parse("multipart/form-data"), "天府之都");
-
-        //file
-        RequestBody requestFile =
-                RequestBody.create(MediaType.parse("multipart/form-data"), file);
-
-        //包装RequestBody，在其内部实现上传进度监听
-        CountingRequestBody countingRequestBody=new CountingRequestBody(requestFile, new CountingRequestBody.Listener() {
-            @Override
-            public void onRequestProgress(long bytesWritten, long contentLength) {
-            }
-        });
-
-        MultipartBody.Part body =
-                MultipartBody.Part.createFormData("file", file.getName(), countingRequestBody);
-
-        Call<ResponseBody> userCall=mClient.getRectService().uploadFile(username,address,body);
-        userCall.enqueue(new Callback<ResponseBody>() {
-            @Override
-            public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
-                   Log.e("---------------","************"+response.body());
-            }
-
-            @Override
-            public void onFailure(Call<ResponseBody> call, Throwable t) {
-                Log.e("---------------","************1111"+t.getMessage());
-            }
-        });
+    File file = new File("/sdcard/", "a.xlxs");
+    //file
+    RequestBody requestFile = RequestBody.create(MediaType.parse("multipart/form-data"), file);
+    //监听上传进度
+    CountingRequestBody countingRequestBody = new CountingRequestBody(requestFile, new CountingRequestBody.Liste
+        @Override
+        public void onRequestProgress(long bytesWritten, long contentLength) {
+            tvFile.setText("上传进度:" + contentLength + ":" + bytesWritten);
+        }
+    });
+    
+    MultipartBody.Part body =
+            MultipartBody.Part.createFormData("file", file.getName(),countingRequestBody);
+            
+    mRestClient = new RestClient("http://192.168.4.111:686/");
+    
+    Call<ResponseBody> responseBodyCall = mRestClient.getRectService().uploadSimpleFile(body);
+    
+    responseBodyCall.enqueue(new Callback<ResponseBody>() {
+        @Override
+        public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
+            tvFile.setText("上传成功");
+        }
+        @Override
+        public void onFailure(Call<ResponseBody> call, Throwable t) {
+            tvFile.setText(t.toString());
+        }
+    });
 ```
+
+看看效果图：
+
+![retro](http://img.blog.csdn.net/20160729142338985)
+
 
 ##多文件上传
 
@@ -337,211 +337,216 @@ Call<ResponseBody> uploads(@PartMap Map<String, RequestBody> params);
 ```
 
 ```
-/必须使用LinkedHashMap，保证文件按顺序上传
-Map<String,RequestBody> params=new LinkedHashMap<>();
-  File file1=new File(Environment.getExternalStorageDirectory(),"3436.jpg");
-  RequestBody filebody1 =RequestBody.create(MediaType.parse("multipart/form-data"), file1);
-  //记录文件上传进度
-  CountingRequestBody countingRequestBody1=new CountingRequestBody(filebody1, new CountingRequestBody.Listener() {
-      @Override
-      public void onRequestProgress(long bytesWritten, long contentLength) {
-          Log.e(TAG,"file1:"+contentLength+":"+bytesWritten);
-      }
-  });
-  //file代表服务器接收到的key,file1.getName()代表文件名
-  params.put("file\";filename=\""+file1.getName(),countingRequestBody1);
+    private void initData() {
+        //保证文件按顺序上传 使用LinkedHashMap
+        params = new LinkedHashMap<>();
+
+        File file1 = new File("/sdcard/", "a.xlxs");
+        final RequestBody requestBody1 = RequestBody.create(MediaType.parse("multipart/form-data"), file1);
+        //监听上传进度
+        CountingRequestBody countingRequestBody1 = new CountingRequestBody(requestBody1, new CountingRequestBody.Listener() {
+            @Override
+            public void onRequestProgress(long bytesWritten, long contentLength) {
+                tvFile1.setText("上传进度:" + contentLength + ":" + bytesWritten);
+            }
+        });
+
+        params.put("file\";filename=\"" + file1.getName(), countingRequestBody1);
 
 
-  File file2=new File(Environment.getExternalStorageDirectory(),"3435.jpg");
-  RequestBody filebody2 =RequestBody.create(MediaType.parse("multipart/form-data"), file2);
-  CountingRequestBody countingRequestBody2=new CountingRequestBody(filebody2, new CountingRequestBody.Listener() {
-      @Override
-      public void onRequestProgress(long bytesWritten, long contentLength) {
-          Log.e(TAG,"file2:"+contentLength+":"+bytesWritten);
-      }
-  });
-  params.put("file\";filename=\""+file2.getName(),countingRequestBody2);
+        File file2 = new File("/sdcard/", "a.xlxs");
+        RequestBody requestBody2 = RequestBody.create(MediaType.parse("multipart/form-data"), file2);
+        //监听上传进度
+        CountingRequestBody countingRequestBody2 = new CountingRequestBody(requestBody2, new CountingRequestBody.Listener() {
+            @Override
+            public void onRequestProgress(long bytesWritten, long contentLength) {
+                tvFile2.setText("上传进度:" + contentLength + ":" + bytesWritten);
+            }
+        });
+
+        params.put("file\";filename=\"" + file2.getName(), countingRequestBody2);
 
 
-  File file3=new File(Environment.getExternalStorageDirectory(),"3438.jpg");
-  RequestBody filebody3 =RequestBody.create(MediaType.parse("multipart/form-data"), file3);
-  CountingRequestBody countingRequestBody3=new CountingRequestBody(filebody3, new CountingRequestBody.Listener() {
-      @Override
-      public void onRequestProgress(long bytesWritten, long contentLength) {
-          Log.e(TAG,"file3:"+contentLength+":"+bytesWritten);
-      }
-  });
-  params.put("file\";filename=\""+file3.getName(),countingRequestBody3);
+        mRestClient = new RestClient("http://192.168.4.111:686/");
 
-  //普通key/value
-  params.put("username",   RequestBody.create(
-          MediaType.parse("multipart/form-data"), "ws"));
-  params.put("address", RequestBody.create(
-          MediaType.parse("multipart/form-data"), "天府之都"));
+        btnUpload.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Call<ResponseBody> responseBodyCall = mRestClient.getRectService().uploadMultiFiles(params);
+                responseBodyCall.enqueue(new Callback<ResponseBody>() {
+                    @Override
+                    public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
+                        tvFile1.setText("上传成功");
+                        tvFile2.setText("上传成功");
+                    }
 
-  Call<ResponseBody> userCall=myService.uploads(params);
-  userCall.enqueue(new Callback<ResponseBody>() {
-      @Override
-      public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
-           Log.e("-------", ""+response.body());
+                    @Override
+                    public void onFailure(Call<ResponseBody> call, Throwable t) {
 
-      }
+                    }
+                });
+            }
+        });
 
-      @Override
-      public void onFailure(Call<ResponseBody> call, Throwable t) {
-         
-      }
-  });
+    }
 ```
+
+在文章的后面我会附上**源码**，这里我就不在贴图了，具体请看**demo**
 
 ##文件下载
 
 ```
-    //文件下载
-    @Streaming
-    @GET("/33/photo/android-117d-85ed-4985-91f9-97684944{filename}")
-    Call<ResponseBody> downFile(@Path("filename") String fileName);
+@Streaming
+@GET("/image/h%3D360/sign=86aee1fbf1deb48fe469a7d8c01e3aef/{filename}")
+Call<ResponseBody> downFile(@Path("filename") String fileName);
+    
 ```
 
-注意：`filename`是访问地址截断的最后部分，如`http://jms-pic.b0.upaiyun.com/33/photo/android-117d-85ed-4985-91f9-976849446348.jpg`是图片地址`/33/photo/android-117d-85ed-4985-91f9-976849446348.jpg`的后部分，那么`{filename}`为`"6348.jpg"`
+处理方式基本和上面几种差不多：
 
 ```
-  Call<ResponseBody> userCall = mClient.getRectService().downFile(mFileName);
+public class DownFileActivity extends AppCompatActivity {
 
-        userCall.enqueue(new Callback<ResponseBody>() {
+    private ImageView iv;
+    private Button btnDown;
+    private RestClient mRestClient;
+
+    private String fileName;
+
+    @Override
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_down_file);
+
+        iv = (ImageView) findViewById(R.id.iv);
+        btnDown = (Button) findViewById(R.id.btn_down);
+
+        mRestClient = new RestClient("http://d.hiphotos.baidu.com/");
+
+        fileName = "b812c8fcc3cec3fd8757dcefd488d43f8794273a.jpg";
+
+        btnDown.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
-            
-                try {
-                    String fileName = Environment.getExternalStorageDirectory() + "/" + mFileName;
-
-                    FileOutputStream fos = null;
-
-                    fos = new FileOutputStream(fileName);
-                    InputStream is = response.body().byteStream();
-
-                    byte[] buf = new byte[1024];
-                    int len;
-                    while ((len = is.read(buf)) != -1) {
-                        fos.write(buf, 0, len);
+            public void onClick(View view) {
+                Call<ResponseBody> userCall = mRestClient.getRectService().downFile(fileName);
+                userCall.enqueue(new Callback<ResponseBody>() {
+                    @Override
+                    public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
+                        
+                        iv.setImageBitmap(BitmapFactory.decodeStream(response.body().byteStream()));
+                        //saveFile(response.body().byteStream());
                     }
-                    is.close();
-                    fos.close();
 
-                } catch (FileNotFoundException e) {
-                    e.printStackTrace();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
+                    @Override
+                    public void onFailure(Call<ResponseBody> call, Throwable t) {
 
-            @Override
-            public void onFailure(Call<ResponseBody> call, Throwable t) {
-
+                    }
+                });
             }
         });
+    }
+    
+    public void saveFile(InputStream is){
+        try {
+            String fn = Environment.getExternalStorageDirectory() + "/" + fileName;
+            FileOutputStream fos = new FileOutputStream(fn);
+            byte[] buf = new byte[1024];
+            int len;
+            while ((len = is.read(buf)) != -1) {
+                fos.write(buf, 0, len);
+            }
+            is.close();
+            fos.close();
+        } catch (Exception ex) {
 
+        }
+    }
+}
 ```
 
-图片就下载下来了，赶紧去我的文件中查看吧。
+效果一览：
+
+![retro](http://img.blog.csdn.net/20160729154449165)
+
+----------
 
 ##开启OKHttp的日志拦截
 
-`Retrofit2`底层还是使用的`OKHttp`,可以使用其相关的一些特性，比如开启日志拦截,此时就不能使用`Retrofit2`默认的`OKHttp`实例，开启日志后，会记录request和response的相关信息，需要自己单独构造，完整代码如下:
+开启日志后，会记录request和response的相关信息，非常实用，也非常强大，不知道是否是编码格式，我下载图片打印的全是乱码。
 
 ```
- HttpLoggingInterceptor logging = new HttpLoggingInterceptor();
-  
-    public RestClient() {
-
-        logging.setLevel(HttpLoggingInterceptor.Level.BODY);
-
-        OkHttpClient.Builder httpClient = new OkHttpClient.Builder();
-
-        httpClient.addInterceptor(logging);
-
-        mRetrofit = new Retrofit.Builder()
-                .baseUrl(BASE_URL)
-                .addConverterFactory(GsonConverterFactory.create())
-                .client(httpClient.build())
-                .build();
-
-        mService = mRetrofit.create(RestService.class);
-    }
+public void initRestClint(String baseUrl) {
+    logging.setLevel(HttpLoggingInterceptor.Level.BODY);
+    OkHttpClient.Builder httpClient = new OkHttpClient.Builder();
+    httpClient.addInterceptor(logging);
+    mRetrofit = new Retrofit.Builder()
+            .baseUrl(baseUrl)
+            .addConverterFactory(GsonConverterFactory.create())
+            .addCallAdapterFactory(RxJavaCallAdapterFactory.create())
+            .client(httpClient.build())
+            .build();
+    mService = mRetrofit.create(RestService.class);
+}
 ```
 
-`logcat`日志：
+类似这样的`logcat`日志：
 
-```
-05-19 00:00:27.610 16229-16287/com.github.ws.retrofitview D/OkHttp: <-- 200 OK http://plus.366ec.net/Route.axd?method=vast.sync.category.issued&format=Json (207ms)
-05-19 00:00:27.610 16229-16287/com.github.ws.retrofitview D/OkHttp: Cache-Control: private
-05-19 00:00:27.610 16229-16287/com.github.ws.retrofitview D/OkHttp: Content-Length: 1356
-05-19 00:00:27.610 16229-16287/com.github.ws.retrofitview D/OkHttp: Content-Type: application/json; charset=utf-8
-05-19 00:00:27.610 16229-16287/com.github.ws.retrofitview D/OkHttp: Set-Cookie: ASP.NET_SessionId=cp5pfhe4mohzvopayfqpi3vs; path=/; HttpOnly
-05-19 00:00:27.610 16229-16287/com.github.ws.retrofitview D/OkHttp: Server: IIS
-05-19 00:00:27.610 16229-16287/com.github.ws.retrofitview D/OkHttp: X-AspNet-Version: 0
-05-19 00:00:27.610 16229-16287/com.github.ws.retrofitview D/OkHttp: X-Powered-By: WAF/2.0
-05-19 00:00:27.610 16229-16287/com.github.ws.retrofitview D/OkHttp: Date: Wed, 18 May 2016 16:00:19 GMT
-05-19 00:00:27.610 16229-16287/com.github.ws.retrofitview D/OkHttp: OkHttp-Sent-Millis: 1463587227552
-05-19 00:00:27.610 16229-16287/com.github.ws.retrofitview D/OkHttp: OkHttp-Received-Millis: 1463587227614
-05-19 00:00:27.610 16229-16287/com.github.ws.retrofitview D/OkHttp: {"Code":"0","Result":[],"ServerTime":"2016/5/19 
-```
+![retro](http://img.blog.csdn.net/20160729155052152)
 
-##Retrofit2与RxJava整合
 
-`gradle`构建
+##Retrofit2与RxJava结合使用
+
+添加库：
 
 ```
     compile 'io.reactivex:rxandroid:1.1.0'
     compile 'com.squareup.retrofit2:adapter-rxjava:2.0.0'
 ```
 
-构造http接口类：
+添加`addCallAdapterFactory(RxJavaCallAdapterFactory.create())`到`Retrofit.Builder`中：
 
 ```
-        mRetrofit = new Retrofit.Builder()
-                .baseUrl(BASE_URL)
-                .addConverterFactory(GsonConverterFactory.create())
-                .addCallAdapterFactory(RxJavaCallAdapterFactory.create()) //添加这一行
-                .client(httpClient.build())
-                .build();
+mRetrofit = new Retrofit.Builder()
+        .baseUrl(baseUrl)
+        .addConverterFactory(GsonConverterFactory.create())
+        .addCallAdapterFactory(RxJavaCallAdapterFactory.create())
+        .client(httpClient.build())
+        .build();
 ```
 
-这里举个简单的例子：
+那么我们结合`RxJava`一起使用呢，下面我们一起来看一看：
 
 ```
-   @GET("/Route.axd?method=vast.sync.category.issued&format=Json")
-    Observable<ApiResponse<Category>> getCategory(@QueryMap HashMap<String, String> hm);
+@GET("/Route.axd?method=vast.Store.manager.list")
+Observable<BaseResponse<Manager>> getManagers(@Query("StoreId") int id);
 ```
 
+通过我们的观察是不是发现只有返回值发送了变化，`Observable`类型。
+
 ```
-        HashMap<String,String> hm=new HashMap<>();
-        hm.put("StoreId","1");
-        hm.put("Condition","");
-        hm.put("LastUpdateTime","");
-        hm.put("PageIndex","1");
-        hm.put("PageSize","20");
-
-       mClient.getRectService().getCategory(hm).subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
-               .subscribe(new Subscriber<ApiResponse<Category>>() {
-                   @Override
-                   public void onCompleted() {
-                       
-                   }
-
-                   @Override
-                   public void onError(Throwable e) {
-
-                   }
-
-                   @Override
-                   public void onNext(ApiResponse<Category> categoryApiResponse) {
-
-                   }
-               });
+//获取实例
+mRestClient = new RestClient();
+mRestClient.getRectService().getManagers(49)
+        .subscribeOn(Schedulers.io())
+        .observeOn(AndroidSchedulers.mainThread())
+        .subscribe(new Subscriber<BaseResponse<Manager>>() {
+            @Override
+            public void onCompleted() {
+            }
+            @Override
+            public void onError(Throwable e) {
+            }
+            @Override
+            public void onNext(BaseResponse<Manager> managerBaseResponse) {
+                
+            }
+        });
 ```
 
-`RxJava`支持链式写法，可以处理一些很复杂的问题。这里列出了`Get`的使用方法，其他的类似。
+`RxJava`支持链式写法，可以处理一些很复杂的问题。
 
-熬不住了，就写到这里了。最后源码需要的留言哈。
+[源码地址](https://github.com/HpWens/Retrofit2RxJava)
+
+如果对你有所帮助，还请**stat**，欢迎加入**478720016** 来帮助更多的人
+
+
