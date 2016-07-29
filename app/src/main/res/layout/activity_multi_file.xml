@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
+
+    <TextView
+        android:id="@+id/tv_file1"
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:layout_centerInParent="true"
+        android:gravity="center"
+        android:text="a1.xlxs"/>
+
+    <TextView
+        android:id="@+id/tv_file2"
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:layout_below="@+id/tv_file1"
+        android:layout_centerInParent="true"
+        android:gravity="center"
+        android:text="a2.xlxs"/>
+
+    <Button
+        android:id="@+id/btn_upload"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:background="@color/colorPrimaryDark"
+        android:text="上传多个文件"
+        android:textColor="#fff"/>
+
+</RelativeLayout>
